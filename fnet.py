@@ -4,58 +4,44 @@ import torch.nn as nn
 import scipy as sp
 import numpy as np
 
+from transformers import BertTokenizer
+
 from src.parameters import Params
-from src.layers import Embedder, Fourier, Normalize, FeedForward, Dense
-    
-
-class FNet(nn.Module):
-
-    def __init__(self, params: Params):
-        super().__init__()
-        self.model = nn.ModuleList([])
-
-        # append embedder
-        self.model.append(nn.ModuleList([Embedder(
-            params.num_embeddings,
-            params.embedding_dim
-        )]))
-
-        # append Fourier blocks
-        for _ in range(params.N):
-            self.model.append(nn.ModuleList([
-                Fourier(),
-                Normalize(params.embedding_dim),
-                FeedForward(),
-                Normalize(params.embedding_dim)
-            ]))
-
-        # add dense layer
-        self.model.append(nn.ModuleList([Dense(
-                params.input_size,
-                params.num_classes,
-                params.dropout_rate
-        )]))
+from src.layers import Embedder, Fourier, FeedForward, Pooler
+from src.model import FNet
 
 
-    def forward(self, X: np.array, params: Params):
 
-        for module in self.model.modules():
-            if isinstance(module, Embedder):
-                X = module(X)
-            else:
-                X = module(X, params)
+# get input_ids and token_type_ids
+def tokenize(sentence: str):
 
-        return X
-    
+    # get tokenizer
+    tokenizer = BertTokenizer.from_pretrained("DaNLP/da-bert-tone-subjective-objective")
 
-# embedder = Embedder(10, 3)
-# input = torch.LongTensor([[1, 2, 4, 5],[4, 3, 2, 9]])
-# print(embedder(input))
+    # tokenized words
+    tokenized_sentence = tokenizer(sentence)
+
+    return tokenized_sentence
+
+sentence = "This is a test sequence of words"
+tokenized_sentence = tokenize(sentence)
+
+# get input_ids, token_type_ids
+input_ids = torch.tensor(tokenized_sentence["input_ids"])
+token_type_ids = torch.tensor(tokenized_sentence["token_type_ids"])
 
 params = Params()
 
-four = Fourier()
-print(four(np.array([[1,0],[0,1]]), params))
+embedder = Embedder(params)
+embedder(input_ids, token_type_ids)
+
+
+# embedder = Embedder(params)
+# input = torch.LongTensor([[1, 2, 4, 5],[4, 3, 2, 9]])
+# print(embedder(input))
+
+# four = Fourier()
+# print(four(np.array([[1,0],[0,1]]), params))
 
 
 
