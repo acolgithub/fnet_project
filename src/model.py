@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 from .parameters import Params
-from .layers import Embedder, Fourier, FeedForward, Pooler
+from .layers import Embedder, FNetEncoder, Pooler
 
 
 
@@ -11,29 +11,20 @@ class FNet(nn.Module):
 
     def __init__(self, params: Params):
         super().__init__()
-        self.model = nn.ModuleList([])
-
-        # append embedder
-        self.model.append(nn.ModuleList([Embedder(params)]))
-
-        # append Fourier blocks
-        for _ in range(params.number_of_layers):
-            self.model.append(nn.ModuleList([
-                Fourier(),
-                FeedForward(),
-            ]))
-
-        # add pooler
-        self.model.append(nn.ModuleList([Pooler(params)]))
+        self.embedder = Embedder(params)
+        self.fnet_encoder = FNetEncoder(params)
+        self.pooler = Pooler(params)
 
 
-    def forward(self, X: torch.tensor, params: Params):
+    def forward(
+        self,
+        input_ids: torch.tensor,
+        token_type_ids: torch.tensor,
+        params: Params
+    ):
 
-        for module in self.model.modules():
-            if isinstance(module, Embedder):
-                X = module(X)
-            else:
-                X = module(X, params)
-
-        return X
+        output = self.embedder(input_ids, token_type_ids)
+        output = self.fnet_encoder(output, params)
+        output = self.pooler(output)
+        return output
 

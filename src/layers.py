@@ -36,7 +36,7 @@ class Embedder(nn.Module):
         # additional layers found in the google implementation
         self.embedding_layer_norm = nn.LayerNorm(
             normalized_shape = params.embedding_dimension,
-            eps = params.norm_epsilon
+            eps = params.layer_norm_epsilon
         )
         self.embedding_linear_layer = nn.Linear(
             in_features = params.embedding_dimension,
@@ -97,6 +97,10 @@ class FeedForward(nn.Module):
             params.embedding_dimension
         )
         self.dropout = nn.Dropout(params.dropout_rate)
+        self.feed_forward_layer_norm = nn.LayerNorm(
+            normalized_shape = params.embedding_dimension,
+            eps = params.layer_norm_epsilon
+        )
 
 
     def forward(self, hidden_layer: torch.tensor):
@@ -105,9 +109,42 @@ class FeedForward(nn.Module):
         activation_output = self.gelu(linear1_ouput)
         linear2_output = self.linear2(activation_output)
         dropout_output = self.dropout(linear2_output)
+        layer_norm_output = self.feed_forward_layer_norm(dropout_output)
 
 
-        return dropout_output
+        return layer_norm_output
+    
+
+class FNetLayer(nn.Module):
+
+    def __init__(self, params: Params):
+        super().__init__()
+        self.fourier = Fourier()
+        self.feed_forward = FeedForward(params)
+
+    def forward(self, hidden_layer: torch.tensor, params: Params):
+
+        fourier_output = self.fourier(hidden_layer, params)
+        feed_forward_output = self.feed_forward(fourier_output)
+        return feed_forward_output
+    
+
+class FNetEncoder(nn.Module):
+
+    def __init__(self, params: Params):
+        super().__init__()
+        self.iterated_layer = nn.ModuleList([])
+        for _ in range(params.number_of_layers):
+            self.iterated_layer.append(FNetLayer(params))
+
+    def forward(self, hidden_layer: torch.tensor, params: Params):
+
+        for fnetlayer_module in self.iterated_layer:
+
+            # apply each fnet layer in module list
+            hidden_layer = fnetlayer_module(hidden_layer, params)
+
+        return hidden_layer
     
 
 class Pooler(nn.Module):

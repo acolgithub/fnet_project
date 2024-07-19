@@ -5,7 +5,7 @@ class Params():
         self,
 
         # general parameters
-        norm_epsilon = 1e-12,
+        layer_norm_epsilon = 1e-12,
         dropout_rate = 0.2,
         number_of_layers = 2,
 
@@ -20,7 +20,7 @@ class Params():
     ) -> None:
         
         # general parameters
-        self.norm_epsilon = norm_epsilon
+        self.layer_norm_epsilon = layer_norm_epsilon
         self.dropout_rate = dropout_rate
         self.number_of_layers = number_of_layers
 
