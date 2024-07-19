@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-
-import scipy as sp
 import numpy as np
 
 from .parameters import Params
@@ -12,6 +10,8 @@ class Embedder(nn.Module):
 
     def __init__(self, params: Params):
         super().__init__()
+
+        # embeddings used in fnet architecture
         self.word_embeddings = nn.Embedding(
             num_embeddings = params.vocab_size,
             embedding_dim = params.embedding_dimension#,
@@ -114,12 +114,10 @@ class Pooler(nn.Module):
 
     def __init__(self, params: Params):
         super().__init__()
-        self.linear = nn.Linear(
-            params.pooler_linear_input_size,
+        self.pooler_linear = nn.Linear(
+            params.embedding_dimension,
             params.pooler_linear_num_classes,
-            params.dropout_rate
         )
-        self.pooler_linear = nn.Linear()
         self.pooler_activation = nn.Tanh()
 
     def forward(self, hidden_states):

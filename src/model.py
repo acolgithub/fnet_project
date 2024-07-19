@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-
-import scipy as sp
 import numpy as np
 
 from .parameters import Params
@@ -29,7 +27,7 @@ class FNet(nn.Module):
         self.model.append(nn.ModuleList([Pooler(params)]))
 
 
-    def forward(self, X: np.array, params: Params):
+    def forward(self, X: torch.tensor, params: Params):
 
         for module in self.model.modules():
             if isinstance(module, Embedder):
