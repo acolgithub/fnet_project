@@ -3,6 +3,12 @@ from transformers import BertTokenizer
 
 
 def preprocess(sentence: str):
+    """
+    A function to preprocess text before it is passed to the FNet model.
+
+    Args:
+        sentence (str): A sentence to tokenize and obtain the corresponding input ids and token type ids.
+    """
 
     # get tokenizer
     tokenizer = BertTokenizer.from_pretrained("DaNLP/da-bert-tone-subjective-objective")

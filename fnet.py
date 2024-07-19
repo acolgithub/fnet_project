@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
+import math
 
 from src.parameters import Params
 from src.preprocessing import preprocess
@@ -11,6 +11,7 @@ from src.model import FNet
 # initalize model parameters
 params = Params()
 
+# create test sentence and preprocess it
 sentence = "This is a test sequence of words"
 input_ids, token_type_ids = preprocess(sentence)
 

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
+import math
 
 from .parameters import Params
 
@@ -8,7 +8,7 @@ from .parameters import Params
 # define embedder for FNet architecture
 class Embedder(nn.Module):
 
-    def __init__(self, params: Params):
+    def __init__(self, params: Params) -> None:
         super().__init__()
 
         # embeddings used in fnet architecture
@@ -45,7 +45,7 @@ class Embedder(nn.Module):
         self.embedding_dropout = nn.Dropout(params.dropout_rate)
 
 
-    def forward(self, input_ids: torch.tensor, token_type_ids: torch.tensor):
+    def forward(self, input_ids: torch.tensor, token_type_ids: torch.tensor) -> torch.tensor:
 
         seq_length = input_ids.size()[0]
         position_ids = self.position_ids[:,:seq_length]
@@ -67,24 +67,27 @@ class Embedder(nn.Module):
 
 # create fourier layer of model
 class Fourier(nn.Module):
+    """
+    Class to implement the layer which applies the fourier transform.
+    """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     
-    def forward(self, hidden_layer: torch.tensor, params: Params):
+    def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
 
         # iterate over different axes of array and apply fft
         for s in range(hidden_layer.ndim):
             X = torch.fft.fftn(hidden_layer, dim=s)
 
-        # return the real part
-        return X.real / np.sqrt(params.number_of_layers)
+        # return the real part after dividing by sqrt(number_of_layers)
+        return X.real / math.sqrt(params.number_of_layers)
     
 
 class FeedForward(nn.Module):
 
-    def __init__(self, params: Params):
+    def __init__(self, params: Params) -> None:
         super().__init__()
 
         self.linear1 = nn.Linear(
@@ -103,7 +106,7 @@ class FeedForward(nn.Module):
         )
 
 
-    def forward(self, hidden_layer: torch.tensor):
+    def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
 
         linear1_ouput = self.linear1(hidden_layer)
         activation_output = self.gelu(linear1_ouput)
@@ -116,13 +119,16 @@ class FeedForward(nn.Module):
     
 
 class FNetLayer(nn.Module):
+    """
+    Class to combine the fourier transform layer with the feed forward layer.
+    """
 
-    def __init__(self, params: Params):
+    def __init__(self, params: Params) -> None:
         super().__init__()
         self.fourier = Fourier()
         self.feed_forward = FeedForward(params)
 
-    def forward(self, hidden_layer: torch.tensor, params: Params):
+    def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
 
         fourier_output = self.fourier(hidden_layer, params)
         feed_forward_output = self.feed_forward(fourier_output)
@@ -130,14 +136,18 @@ class FNetLayer(nn.Module):
     
 
 class FNetEncoder(nn.Module):
+    """
+    Class to group together all the layers involving the fourier transform
+    layer combined with the feed forward layer.
+    """
 
-    def __init__(self, params: Params):
+    def __init__(self, params: Params) -> None:
         super().__init__()
         self.iterated_layer = nn.ModuleList([])
         for _ in range(params.number_of_layers):
             self.iterated_layer.append(FNetLayer(params))
 
-    def forward(self, hidden_layer: torch.tensor, params: Params):
+    def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
 
         for fnetlayer_module in self.iterated_layer:
 
@@ -149,7 +159,7 @@ class FNetEncoder(nn.Module):
 
 class Pooler(nn.Module):
 
-    def __init__(self, params: Params):
+    def __init__(self, params: Params) -> None:
         super().__init__()
         self.pooler_linear = nn.Linear(
             params.embedding_dimension,
@@ -157,7 +167,7 @@ class Pooler(nn.Module):
         )
         self.pooler_activation = nn.Tanh()
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states) -> torch.tensor:
 
         pooler_output = self.pooler_linear(hidden_states)
         pooler_output = self.pooler_activation(pooler_output)

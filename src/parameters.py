@@ -1,5 +1,7 @@
-# class to hold model parameters
 class Params():
+    """
+    Class to store the configuration parameters of the model.
+    """
 
     def __init__(
         self,

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
+import math
 
 from .parameters import Params
 from .layers import Embedder, FNetEncoder, Pooler
@@ -8,6 +8,9 @@ from .layers import Embedder, FNetEncoder, Pooler
 
 
 class FNet(nn.Module):
+    """
+    Class to store the layers of the FNet architecture.
+    """
 
     def __init__(self, params: Params):
         super().__init__()
