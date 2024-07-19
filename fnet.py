@@ -12,7 +12,7 @@ from src.model import FNet
 
 
 
-# get input_ids and token_type_ids
+# tokenizer sentence
 def tokenize(sentence: str):
 
     # get tokenizer
@@ -30,19 +30,20 @@ tokenized_sentence = tokenize(sentence)
 input_ids = torch.tensor(tokenized_sentence["input_ids"])
 token_type_ids = torch.tensor(tokenized_sentence["token_type_ids"])
 
+# initalize model parameters
 params = Params()
 
+# instantiate embedder and apply to input_ids and token_type_ids
 embedder = Embedder(params)
-embedder(input_ids, token_type_ids)
+embedder_output = embedder(input_ids, token_type_ids)
 
+# apply fourier transform layer
+four = Fourier()
+fourier_output = four(embedder_output, params)
 
-# embedder = Embedder(params)
-# input = torch.LongTensor([[1, 2, 4, 5],[4, 3, 2, 9]])
-# print(embedder(input))
-
-# four = Fourier()
-# print(four(np.array([[1,0],[0,1]]), params))
-
+# apply feed forward layer
+ff = FeedForward(params)
+ff(fourier_output)
 
 
 

@@ -45,7 +45,7 @@ class Embedder(nn.Module):
         self.embedding_dropout = nn.Dropout(params.dropout_rate)
 
 
-    def forward(self, input_ids, token_type_ids):
+    def forward(self, input_ids: torch.tensor, token_type_ids: torch.tensor):
 
         seq_length = input_ids.size()[0]
         position_ids = self.position_ids[:,:seq_length]
@@ -65,18 +65,18 @@ class Embedder(nn.Module):
         return embeddings
 
 
-# create neural net module
+# create fourier layer of model
 class Fourier(nn.Module):
 
     def __init__(self):
         super().__init__()
 
     
-    def forward(self, X: np.array, params: Params):
+    def forward(self, hidden_layer: torch.tensor, params: Params):
 
         # iterate over different axes of array and apply fft
-        for s in range(X.ndim):
-            X = sp.fft.fftn(X, axes=s)
+        for s in range(hidden_layer.ndim):
+            X = torch.fft.fftn(hidden_layer, dim=s)
 
         # return the real part
         return X.real / np.sqrt(params.number_of_layers)
@@ -87,22 +87,27 @@ class FeedForward(nn.Module):
     def __init__(self, params: Params):
         super().__init__()
 
-        self.linear = nn.Linear(
-            params.feed_forward_input_size,
-            params.feed_forward_num_classes
+        self.linear1 = nn.Linear(
+            params.embedding_dimension,
+            params.embedding_dimension
         )
         self.gelu = nn.GELU()
-        self.linear = nn.Linear(params.input_size, params.num_classes)
+        self.linear2 = nn.Linear(
+            params.embedding_dimension,
+            params.embedding_dimension
+        )
         self.dropout = nn.Dropout(params.dropout_rate)
 
 
-    def forward(self, X: np.array):
+    def forward(self, hidden_layer: torch.tensor):
 
-        linear_ouput = self.linear(X)
-        dropout_output = self.dropout(linear_ouput)
-        activation_output = self.gelu(dropout_output)
+        linear1_ouput = self.linear1(hidden_layer)
+        activation_output = self.gelu(linear1_ouput)
+        linear2_output = self.linear2(activation_output)
+        dropout_output = self.dropout(linear2_output)
 
-        return activation_output
+
+        return dropout_output
     
 
 class Pooler(nn.Module):
