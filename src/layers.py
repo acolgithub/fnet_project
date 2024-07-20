@@ -1,14 +1,30 @@
+import math
 import torch
 import torch.nn as nn
-import math
 
 from .parameters import Params
 
 
 # define embedder for FNet architecture
 class Embedder(nn.Module):
+    """Embedder layer for FNet architecture.
+
+    Attributes:
+        word_embeddings: Embedder applied to input_ids.
+        position_embeddings: Embedder applied to position_ids.
+        token_type_embeddings: Embedder applied to token_type_ids.
+        embedding_layer_norm: Normalization layer contained in Embedder.
+        embedding_linear_layer: Linear layer contained in Embedder.
+        embedding_dropout: Dropout layer to randomly zero out linear layer.
+    """
 
     def __init__(self, params: Params) -> None:
+        """Initializes Embedder layer of FNet architecture.
+
+        Args:
+            params: Configuration parameters of the model.
+        """
+
         super().__init__()
 
         # embeddings used in fnet architecture
@@ -21,7 +37,7 @@ class Embedder(nn.Module):
             embedding_dim = params.embedding_dimension
         )
         self.token_type_embeddings = nn.Embedding(
-            num_embeddings = params.token_type_embedding_hidden_size,
+            num_embeddings = params.token_type_embedding_size,
             embedding_dim = params.embedding_dimension
         )
 
@@ -46,6 +62,12 @@ class Embedder(nn.Module):
 
 
     def forward(self, input_ids: torch.tensor, token_type_ids: torch.tensor) -> torch.tensor:
+        """Defines forward pass for Embedder layer.
+
+        Args:
+            input_ids: Torch tensor containing input ids from tokenizer.
+            token_type_ids: Torch tensor containing token type ids from tokenizer.
+        """
 
         seq_length = input_ids.size()[0]
         position_ids = self.position_ids[:,:seq_length]
@@ -67,15 +89,25 @@ class Embedder(nn.Module):
 
 # create fourier layer of model
 class Fourier(nn.Module):
-    """
-    Class to implement the layer which applies the fourier transform.
+    """Class to implement the layer which applies the fourier transform.
+    
     """
 
     def __init__(self) -> None:
+        """Initializes Fourier transform layer of FNet architecture.
+
+        """
+
         super().__init__()
 
     
     def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
+        """Defines forward pass for Fourier Transform layer.
+
+        Args:
+            hidden_layer: Input torch tensor output from previous layers.
+            params: Configuration parameters of the model.
+        """
 
         # iterate over different axes of array and apply fft
         for s in range(hidden_layer.ndim):
@@ -86,8 +118,23 @@ class Fourier(nn.Module):
     
 
 class FeedForward(nn.Module):
+    """Feedforward neural network in FNet architecture.
+
+    Attributes:
+        linear1: First linear layer within neural network.
+        gelu: Gaussian error linear unit activation.
+        linear2: Second linear layer within neural network.
+        dropout: Dropout layer to randomly zero out second linear layer
+        feed_forward_layer_norm: Layer to apply normalization.
+    """
 
     def __init__(self, params: Params) -> None:
+        """Initalizes feed forward layer of FNet architecture.
+
+        Args:
+            params: Configuration parameters of the model.
+        """
+
         super().__init__()
 
         self.linear1 = nn.Linear(
@@ -107,6 +154,11 @@ class FeedForward(nn.Module):
 
 
     def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
+        """Defines forward pass for feed forward layer.
+
+        Args:
+            hidden_layer: Input torch tensor output from previous layer.
+        """
 
         linear1_ouput = self.linear1(hidden_layer)
         activation_output = self.gelu(linear1_ouput)
@@ -119,16 +171,31 @@ class FeedForward(nn.Module):
     
 
 class FNetLayer(nn.Module):
-    """
-    Class to combine the fourier transform layer with the feed forward layer.
+    """Class to combine the fourier transform layer with the feed forward layer.
+
+    Attributes:
+        fourier: A fourier transform layer of the FNet architecture.
+        feed_forward: A feed forward layer of the FNet architecture.
     """
 
     def __init__(self, params: Params) -> None:
+        """Initalizes layer combining fourier layer and feedforward layer.
+
+        Args:
+            params: Configuration parameters of the model.
+        """
+
         super().__init__()
         self.fourier = Fourier()
         self.feed_forward = FeedForward(params)
 
     def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
+        """Defines forward pass for the combined Fourier transform and feed forward layers.
+
+        Args:
+            hidden_layer: Input torch tensor output from previous layer.
+            params: Configuration parameters of the model.
+        """
 
         fourier_output = self.fourier(hidden_layer, params)
         feed_forward_output = self.feed_forward(fourier_output)
@@ -136,18 +203,33 @@ class FNetLayer(nn.Module):
     
 
 class FNetEncoder(nn.Module):
-    """
-    Class to group together all the layers involving the fourier transform
-    layer combined with the feed forward layer.
+    """Class to group together all the layers involving the fourier transform
+       layer combined with the feed forward layer.
+
+    Attributes:
+        iterated_layer: List of FNetLayer blocks.
     """
 
     def __init__(self, params: Params) -> None:
+        """Initializes FNetEncoder block.
+
+        Args:
+            params: Configuration parameters of the model.
+
+        """
+
         super().__init__()
         self.iterated_layer = nn.ModuleList([])
         for _ in range(params.number_of_layers):
             self.iterated_layer.append(FNetLayer(params))
 
     def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
+        """Defines forward pass for FNetEncoder block.
+
+        Args:
+            hidden_layer: Input torch tensor output from previous layer.
+            params: Configuration parameters of the model.
+        """
 
         for fnetlayer_module in self.iterated_layer:
 
@@ -158,8 +240,20 @@ class FNetEncoder(nn.Module):
     
 
 class Pooler(nn.Module):
+    """Pooling layer for FNet architecture.
+
+    Attributes:
+        pooler_linear: Linear layer of Pooling layer.
+        pooler_activation: Tanh activation layer.
+    """
 
     def __init__(self, params: Params) -> None:
+        """Initializes Pooler layer of FNet architecture.
+
+        Args:
+            params: Configuration parametes of the model.
+        """
+
         super().__init__()
         self.pooler_linear = nn.Linear(
             params.embedding_dimension,
@@ -167,8 +261,13 @@ class Pooler(nn.Module):
         )
         self.pooler_activation = nn.Tanh()
 
-    def forward(self, hidden_states) -> torch.tensor:
+    def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
+        """Defines forward pass for Pooler layer of Fnet architecture.
 
-        pooler_output = self.pooler_linear(hidden_states)
+        Args:
+            hidden_layer: Input torch tensor output from previous layer.
+        """
+
+        pooler_output = self.pooler_linear(hidden_layer)
         pooler_output = self.pooler_activation(pooler_output)
         return pooler_output

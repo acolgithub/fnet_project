@@ -1,0 +1,2 @@
+torch == 2.3.1
+trnasformers == 4.24.4
