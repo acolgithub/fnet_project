@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 
-from .parameters import Params
+from .parameters import Config
 
 
 # define embedder for FNet architecture
@@ -18,47 +18,47 @@ class Embedder(nn.Module):
         embedding_dropout: Dropout layer to randomly zero out linear layer.
     """
 
-    def __init__(self, params: Params) -> None:
+    def __init__(self, config: Config) -> None:
         """Initializes Embedder layer of FNet architecture.
 
         Args:
-            params: Configuration parameters of the model.
+            config: Configuration parameters of the model.
         """
 
         super().__init__()
 
         # embeddings used in fnet architecture
         self.word_embeddings = nn.Embedding(
-            num_embeddings = params.vocab_size,
-            embedding_dim = params.embedding_dimension#,
+            num_embeddings = config.embedding_params.vocab_size,
+            embedding_dim = config.embedding_params.embedding_dimension
         )
         self.position_embeddings = nn.Embedding(
-            num_embeddings = params.maximum_position_embeddings,
-            embedding_dim = params.embedding_dimension
+            num_embeddings = config.embedding_params.maximum_position_embeddings,
+            embedding_dim = config.embedding_params.embedding_dimension
         )
         self.token_type_embeddings = nn.Embedding(
-            num_embeddings = params.token_type_embedding_size,
-            embedding_dim = params.embedding_dimension
+            num_embeddings = config.embedding_params.token_type_embedding_size,
+            embedding_dim = config.embedding_params.embedding_dimension
         )
 
         # creates tensor of shape (1, maximum_position_embeddings) in memory
         # can be referred to by position_ids
         self.register_buffer(
             "position_ids",
-            torch.arange(params.maximum_position_embeddings).expand((1, -1)),
+            torch.arange(config.embedding_params.maximum_position_embeddings).expand((1, -1)),
             persistent=False
         )
 
         # additional layers found in the google implementation
         self.embedding_layer_norm = nn.LayerNorm(
-            normalized_shape = params.embedding_dimension,
-            eps = params.layer_norm_epsilon
+            normalized_shape = config.embedding_params.embedding_dimension,
+            eps = config.embedding_params.layer_norm_epsilon
         )
         self.embedding_linear_layer = nn.Linear(
-            in_features = params.embedding_dimension,
-            out_features = params.embedding_dimension
+            in_features = config.embedding_params.embedding_dimension,
+            out_features = config.embedding_params.embedding_dimension
         )
-        self.embedding_dropout = nn.Dropout(params.dropout_rate)
+        self.embedding_dropout = nn.Dropout(config.embedding_params.dropout_rate)
 
 
     def forward(self, input_ids: torch.tensor, token_type_ids: torch.tensor) -> torch.tensor:
@@ -101,20 +101,19 @@ class Fourier(nn.Module):
         super().__init__()
 
     
-    def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
+    def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
         """Defines forward pass for Fourier Transform layer.
 
         Args:
             hidden_layer: Input torch tensor output from previous layers.
-            params: Configuration parameters of the model.
         """
 
         # iterate over different axes of array and apply fft
         for s in range(hidden_layer.ndim):
             X = torch.fft.fftn(hidden_layer, dim=s)
 
-        # return the real part after dividing by sqrt(number_of_layers)
-        return X.real / math.sqrt(params.number_of_layers)
+        # return the real part
+        return X.real
     
 
 class FeedForward(nn.Module):
@@ -128,28 +127,28 @@ class FeedForward(nn.Module):
         feed_forward_layer_norm: Layer to apply normalization.
     """
 
-    def __init__(self, params: Params) -> None:
+    def __init__(self, config: Config) -> None:
         """Initalizes feed forward layer of FNet architecture.
 
         Args:
-            params: Configuration parameters of the model.
+            config: Configuration parameters of the model.
         """
 
         super().__init__()
 
         self.linear1 = nn.Linear(
-            params.embedding_dimension,
-            params.embedding_dimension
+            config.fnet_params.fnet_layer1_input_dimension,
+            config.fnet_params.fnet_layer1_output_dimension
         )
         self.gelu = nn.GELU()
         self.linear2 = nn.Linear(
-            params.embedding_dimension,
-            params.embedding_dimension
+            config.fnet_params.fnet_layer2_input_dimension,
+            config.fnet_params.fnet_layer2_output_dimension
         )
-        self.dropout = nn.Dropout(params.dropout_rate)
+        self.dropout = nn.Dropout(config.fnet_params.dropout_rate)
         self.feed_forward_layer_norm = nn.LayerNorm(
-            normalized_shape = params.embedding_dimension,
-            eps = params.layer_norm_epsilon
+            normalized_shape = config.fnet_params.fnet_layer_norm_dimension,
+            eps = config.fnet_params.layer_norm_epsilon
         )
 
 
@@ -178,26 +177,25 @@ class FNetLayer(nn.Module):
         feed_forward: A feed forward layer of the FNet architecture.
     """
 
-    def __init__(self, params: Params) -> None:
+    def __init__(self, config: Config) -> None:
         """Initalizes layer combining fourier layer and feedforward layer.
 
         Args:
-            params: Configuration parameters of the model.
+            config: Configuration parameters of the model.
         """
 
         super().__init__()
         self.fourier = Fourier()
-        self.feed_forward = FeedForward(params)
+        self.feed_forward = FeedForward(config)
 
-    def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
+    def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
         """Defines forward pass for the combined Fourier transform and feed forward layers.
 
         Args:
             hidden_layer: Input torch tensor output from previous layer.
-            params: Configuration parameters of the model.
         """
 
-        fourier_output = self.fourier(hidden_layer, params)
+        fourier_output = self.fourier(hidden_layer)
         feed_forward_output = self.feed_forward(fourier_output)
         return feed_forward_output
     
@@ -210,31 +208,29 @@ class FNetEncoder(nn.Module):
         iterated_layer: List of FNetLayer blocks.
     """
 
-    def __init__(self, params: Params) -> None:
+    def __init__(self, config: Config) -> None:
         """Initializes FNetEncoder block.
 
         Args:
-            params: Configuration parameters of the model.
-
+            config: Configuration parameters of the model.
         """
 
         super().__init__()
         self.iterated_layer = nn.ModuleList([])
-        for _ in range(params.number_of_layers):
-            self.iterated_layer.append(FNetLayer(params))
+        for _ in range(config.fnet_params.number_of_layers):
+            self.iterated_layer.append(FNetLayer(config))
 
-    def forward(self, hidden_layer: torch.tensor, params: Params) -> torch.tensor:
+    def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
         """Defines forward pass for FNetEncoder block.
 
         Args:
             hidden_layer: Input torch tensor output from previous layer.
-            params: Configuration parameters of the model.
         """
 
         for fnetlayer_module in self.iterated_layer:
 
             # apply each fnet layer in module list
-            hidden_layer = fnetlayer_module(hidden_layer, params)
+            hidden_layer = fnetlayer_module(hidden_layer)
 
         return hidden_layer
     
@@ -247,17 +243,17 @@ class Pooler(nn.Module):
         pooler_activation: Tanh activation layer.
     """
 
-    def __init__(self, params: Params) -> None:
+    def __init__(self, config: Config) -> None:
         """Initializes Pooler layer of FNet architecture.
 
         Args:
-            params: Configuration parametes of the model.
+            config: Configuration parametes of the model.
         """
 
         super().__init__()
         self.pooler_linear = nn.Linear(
-            params.embedding_dimension,
-            params.pooler_linear_num_classes,
+            config.pooler_params.pooler_linear_input_dimensions,
+            config.pooler_params.pooler_linear_output_dimension,
         )
         self.pooler_activation = nn.Tanh()
 

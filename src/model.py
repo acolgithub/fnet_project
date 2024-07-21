@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 
-from .parameters import Params
+from .parameters import Config
 from .layers import Embedder, FNetEncoder, Pooler
 
 
@@ -16,35 +16,32 @@ class FNet(nn.Module):
         pooler: Pooler layer for the FNet architecture.
     """
 
-    def __init__(self, params: Params):
+    def __init__(self, config: Config):
         """Initializes FNet model.
 
         Args:
-            params: Configuration parameters of the model.
+            config: Configuration parameters of the model.
         """
 
         super().__init__()
-        self.embedder = Embedder(params)
-        self.fnet_encoder = FNetEncoder(params)
-        self.pooler = Pooler(params)
+        self.embedder = Embedder(config)
+        self.fnet_encoder = FNetEncoder(config)
+        self.pooler = Pooler(config)
 
 
     def forward(
         self,
         input_ids: torch.tensor,
-        token_type_ids: torch.tensor,
-        params: Params
+        token_type_ids: torch.tensor
     ):
         """Defines forward pass for the FNet architecture.
 
         Args:
             input_ids: Torch tensor containing input ids from tokenizer.
             token_type_ids: Torch tensor containing token type ids from tokenizer.
-            params: Configuration parameters of the model.
         """
 
         output = self.embedder(input_ids, token_type_ids)
-        output = self.fnet_encoder(output, params)
+        output = self.fnet_encoder(output)
         output = self.pooler(output)
         return output
-
