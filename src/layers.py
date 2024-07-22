@@ -108,8 +108,8 @@ class Fourier(nn.Module):
             hidden_layer: Input torch tensor output from previous layers.
         """
 
-        # iterate over different axes of array and apply fft
-        for s in range(hidden_layer.ndim):
+        # iterate over last two axes of array and apply fft
+        for s in range(-1, -3 ,-1):
             X = torch.fft.fftn(hidden_layer, dim=s)
 
         # return the real part
