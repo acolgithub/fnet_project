@@ -30,7 +30,7 @@ class Params():
 
 
 class EmbeddingParams(Params):
-    """Class to store the Embedding layer parameters
+    """Class to store the Embedding layer parameters.
 
     Attributes:
         vocab_size: Size of the base vocabulary.
@@ -61,28 +61,24 @@ class EmbeddingParams(Params):
 
 
 
-class FNetParams(Params):
-    """Class to store the FNet layer parameters
+class FNetEncoderParams(Params):
+    """Class to store the FNet Encoder layer parameters.
 
     Attributes:
+        fourier_layer_norm: Dimension used by Layer norm in Fourier layer.
         fnet_layer1_input_dimension: Input dimension for first linear layer.
         fnet_layer1_output_dimension: Output dimension for first linear layer.
         fnet_layer2_input_dimension: Input dimension for second linear layer.
         fnet_layer2_output_dimension: Output dimension for second linear layer.
         fnet_layer_norm_dimension: Dimension used by Layer norm.
     """
-        
 
-    def __init__(
-            self,
+    def __init__(self) -> None:
 
-            # FNet parameters
-    ) -> None:
-        """Initializes class with the FNet layer configuration parameters.
-
-        """
-        
         super().__init__()
+
+        # fourier layer params
+        self.fourier_layer_norm = self.hidden_dimension
 
         # FNet layer configuration parameters
         self.fnet_layer1_input_dimension = self.hidden_dimension
@@ -95,7 +91,7 @@ class FNetParams(Params):
 
 
 class PoolerParams(Params):
-    """Class to store the Pooler layer parameters
+    """Class to store the Pooler layer parameters.
 
     Attributes:
         pooler_linear_input_dimensions: Input dimension of linear layer.
@@ -135,5 +131,5 @@ class Config():
         """
 
         self.embedding_params = EmbeddingParams()
-        self.fnet_params = FNetParams()
+        self.fnetencoder_params = FNetEncoderParams()
         self.pooler_params = PoolerParams()

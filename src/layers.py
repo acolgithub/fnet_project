@@ -91,14 +91,19 @@ class Embedder(nn.Module):
 class Fourier(nn.Module):
     """Class to implement the layer which applies the fourier transform.
     
+    Attributes:
+        fourier_layer_norm: Layer norm applied to sum for normalization.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, config: Config) -> None:
         """Initializes Fourier transform layer of FNet architecture.
 
+        Args:
+            config: Configuration parameters of the model.
         """
 
         super().__init__()
+        self.fourier_layer_norm = nn.LayerNorm(config.fnetencoder_params.fourier_layer_norm)
 
     
     def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
@@ -108,12 +113,20 @@ class Fourier(nn.Module):
             hidden_layer: Input torch tensor output from previous layers.
         """
 
+        # pass hidden layer
+        output = hidden_layer
+
         # iterate over last two axes of array and apply fft
         for s in range(-1, -3 ,-1):
-            X = torch.fft.fftn(hidden_layer, dim=s)
+            output = torch.fft.fftn(output, dim=s)
 
-        # return the real part
-        return X.real
+        # obtain the real part
+        output = output.real
+
+        # add and apply layer norm
+        output = self.fourier_layer_norm(hidden_layer + output)
+
+        return output
     
 
 class FeedForward(nn.Module):
@@ -124,7 +137,7 @@ class FeedForward(nn.Module):
         gelu: Gaussian error linear unit activation.
         linear2: Second linear layer within neural network.
         dropout: Dropout layer to randomly zero out second linear layer
-        feed_forward_layer_norm: Layer to apply normalization.
+        feed_forward_layer_norm: Layer applied to sum for normalization.
     """
 
     def __init__(self, config: Config) -> None:
@@ -137,18 +150,18 @@ class FeedForward(nn.Module):
         super().__init__()
 
         self.linear1 = nn.Linear(
-            config.fnet_params.fnet_layer1_input_dimension,
-            config.fnet_params.fnet_layer1_output_dimension
+            config.fnetencoder_params.fnet_layer1_input_dimension,
+            config.fnetencoder_params.fnet_layer1_output_dimension
         )
         self.gelu = nn.GELU()
         self.linear2 = nn.Linear(
-            config.fnet_params.fnet_layer2_input_dimension,
-            config.fnet_params.fnet_layer2_output_dimension
+            config.fnetencoder_params.fnet_layer2_input_dimension,
+            config.fnetencoder_params.fnet_layer2_output_dimension
         )
-        self.dropout = nn.Dropout(config.fnet_params.dropout_rate)
+        self.dropout = nn.Dropout(config.fnetencoder_params.dropout_rate)
         self.feed_forward_layer_norm = nn.LayerNorm(
-            normalized_shape = config.fnet_params.fnet_layer_norm_dimension,
-            eps = config.fnet_params.layer_norm_epsilon
+            normalized_shape = config.fnetencoder_params.fnet_layer_norm_dimension,
+            eps = config.fnetencoder_params.layer_norm_epsilon
         )
 
 
@@ -159,14 +172,14 @@ class FeedForward(nn.Module):
             hidden_layer: Input torch tensor output from previous layer.
         """
 
-        linear1_ouput = self.linear1(hidden_layer)
-        activation_output = self.gelu(linear1_ouput)
-        linear2_output = self.linear2(activation_output)
-        dropout_output = self.dropout(linear2_output)
-        layer_norm_output = self.feed_forward_layer_norm(dropout_output)
+        output = self.linear1(hidden_layer)
+        output = self.gelu(output)
+        output = self.linear2(output)
+        output = self.dropout(output)
+        output = self.feed_forward_layer_norm(hidden_layer + output)  # add to mix
 
 
-        return layer_norm_output
+        return output
     
 
 class FNetLayer(nn.Module):
@@ -185,7 +198,7 @@ class FNetLayer(nn.Module):
         """
 
         super().__init__()
-        self.fourier = Fourier()
+        self.fourier = Fourier(config)
         self.feed_forward = FeedForward(config)
 
     def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
@@ -217,7 +230,7 @@ class FNetEncoder(nn.Module):
 
         super().__init__()
         self.iterated_layer = nn.ModuleList([])
-        for _ in range(config.fnet_params.number_of_layers):
+        for _ in range(config.fnetencoder_params.number_of_layers):
             self.iterated_layer.append(FNetLayer(config))
 
     def forward(self, hidden_layer: torch.tensor) -> torch.tensor:
