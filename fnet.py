@@ -1,7 +1,7 @@
 import math
 import torch
 import torch.nn as nn
-from transformers import BertTokenizer
+from transformers import FNetTokenizer
 
 from src.parameters import Config
 from src.preprocessing import preprocess

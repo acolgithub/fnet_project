@@ -1,5 +1,5 @@
 import torch
-from transformers import BertTokenizer
+from transformers import FNetTokenizer
 
 
 def preprocess(sentence: str) -> tuple[torch.tensor, torch.tensor]:
@@ -17,7 +17,7 @@ def preprocess(sentence: str) -> tuple[torch.tensor, torch.tensor]:
     """
 
     # get tokenizer
-    tokenizer = BertTokenizer.from_pretrained("DaNLP/da-bert-tone-subjective-objective")
+    tokenizer = FNetTokenizer.from_pretrained("google/fnet-base")
 
     # tokenize words
     tokenized_sentence = tokenizer(sentence)
@@ -26,4 +26,5 @@ def preprocess(sentence: str) -> tuple[torch.tensor, torch.tensor]:
     input_ids = torch.tensor(tokenized_sentence["input_ids"])
     token_type_ids = torch.tensor(tokenized_sentence["token_type_ids"])
 
+    # return input_ids, token_type_ids
     return input_ids, token_type_ids
